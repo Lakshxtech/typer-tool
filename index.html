@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Typer — The Writer's Canvas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --accent: #c9a96e;
+    --bg: #0d0d0d;
+    --bg2: #141414;
+    --surface: #1c1c1c;
+    --border: #262626;
+    --muted: #444;
+    --sub: #666;
+    --text: #e8e4dc;
+    --btn-hover: rgba(255,255,255,0.06);
+    --ease-silk: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  body.light {
+    --accent: #9b6e30;
+    --bg: #f7f4ef;
+    --bg2: #fffdf9;
+    --surface: #ffffff;
+    --border: #dedad2;
+    --muted: #bbb8b0;
+    --sub: #9a9488;
+    --text: #1a1814;
+    --btn-hover: rgba(0,0,0,0.05);
+  }
+
+  html, body {
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Pro', Georgia, serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    transition: background 0.45s ease, color 0.45s ease;
+  }
+
+  ::selection { background: rgba(201,169,110,0.22); }
+
+  /* ─── Layout ─── */
+  #app {
+    position: relative;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ─── Noise ─── */
+  #noise {
+    position: fixed; inset: 0;
+    pointer-events: none; z-index: 0;
+    opacity: 0.04;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+    transition: opacity 0.4s;
+  }
+  body.light #noise { opacity: 0; }
+
+  /* ─── Orb ─── */
+  #orb {
+    position: fixed; top: -20%; right: -10%;
+    width: 640px; height: 640px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(201,169,110,0.05) 0%, transparent 70%);
+    pointer-events: none; z-index: 0;
+    transition: background 0.5s;
+  }
+  body.light #orb {
+    background: radial-gradient(circle, rgba(155,110,48,0.06) 0%, transparent 70%);
+  }
+
+  /* ─── Header ─── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 2rem 3rem;
+    max-width: 860px; margin: 0 auto;
+    position: relative; z-index: 10;
+    animation: fadeIn 0.6s ease forwards;
+    transition: opacity 0.4s ease;
+  }
+  header.hidden { opacity: 0; pointer-events: none; }
+
+  .logo-wrap { display: flex; align-items: center; gap: 2rem; }
+
+  .logo-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.65rem; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); line-height: 1;
+  }
+  .logo-sub {
+    font-size: 0.7rem; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--sub);
+    margin-top: 5px; font-family: 'Crimson Pro', serif;
+  }
+
+  /* Progress ring + stats */
+  .stats-wrap { display: flex; align-items: center; gap: 0.8rem; }
+  .ring-svg { overflow: visible; }
+  .ring-bg { fill: none; stroke: var(--border); stroke-width: 2; transition: stroke 0.4s; }
+  .ring-fg {
+    fill: none; stroke: var(--accent); stroke-width: 2;
+    stroke-linecap: round;
+    transform-origin: 13px 13px; transform: rotate(-90deg);
+    transition: stroke-dashoffset 0.6s ease, stroke 0.4s;
+  }
+  .stats-text { line-height: 1.25; }
+  .stat-main {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.05rem; font-weight: 500; color: var(--text);
+  }
+  .stat-main span { color: var(--sub); font-size: 0.85rem; font-weight: 400; }
+  .stat-sub {
+    font-size: 0.68rem; letter-spacing: 0.07em;
+    text-transform: uppercase; color: var(--sub);
+    margin-top: 2px;
+  }
+
+  /* Controls */
+  .controls { display: flex; align-items: center; gap: 0.4rem; }
+  .save-pill {
+    display: flex; align-items: center; gap: 5px;
+    font-family: 'Crimson Pro', serif; font-size: 0.7rem;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 3px 10px; border-radius: 20px;
+    color: var(--muted); transition: all 0.35s ease;
+    margin-right: 6px;
+  }
+  .save-pill.active {
+    background: rgba(201,169,110,0.1); color: var(--accent);
+  }
+  body.light .save-pill.active { background: rgba(155,110,48,0.09); }
+  .save-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    animation: pulseDot 1.4s ease infinite;
+    display: none;
+  }
+  .save-pill.active .save-dot { display: block; }
+
+  .icon-btn {
+    width: 34px; height: 34px; border-radius: 10px;
+    border: none; background: transparent;
+    color: var(--sub); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  .icon-btn:hover { background: var(--btn-hover); color: var(--text); transform: translateY(-1px); }
+  .icon-btn:active { transform: scale(0.9); }
+
+  .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; flex-shrink: 0; transition: background 0.4s; }
+
+  /* ─── Main ─── */
+  main {
+    max-width: 680px; margin: 0 auto;
+    padding: 1.5rem 2rem 14rem;
+    position: relative; z-index: 5;
+    transition: padding 0.5s var(--ease-silk);
+  }
+  main.focus-mode { padding-top: 12vh; }
+
+  .rule {
+    height: 1px; margin-bottom: 3rem;
+    background: linear-gradient(to right, transparent, rgba(201,169,110,0.35), transparent);
+    transition: opacity 0.4s;
+  }
+  body.light .rule {
+    background: linear-gradient(to right, transparent, rgba(155,110,48,0.25), transparent);
+  }
+  main.focus-mode .rule { opacity: 0; }
+
+  /* ─── Editor ─── */
+  #editor {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 1.22rem; line-height: 1.9;
+    letter-spacing: 0.01em; font-weight: 300;
+    min-height: 60vh; outline: none;
+    caret-color: var(--accent);
+    color: var(--text);
+    word-break: break-word;
+    animation: fadeUp 0.7s var(--ease-silk) forwards;
+    transition: color 0.4s;
+  }
+
+  #editor:empty::before {
+    content: 'Begin writing…';
+    color: var(--muted); font-style: italic;
+    pointer-events: none; opacity: 0.5;
+  }
+
+  #editor h1 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 3.6rem; font-weight: 600;
+    letter-spacing: -0.025em; line-height: 1.07;
+    margin-bottom: 1.8rem; margin-top: 0.5rem;
+    color: var(--text);
+  }
+  #editor h2 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 2.15rem; font-weight: 500;
+    letter-spacing: -0.01em; line-height: 1.2;
+    margin-top: 3.5rem; margin-bottom: 1.1rem;
+    color: var(--text);
+  }
+  #editor h3 {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 1.5rem; font-weight: 500; font-style: italic;
+    margin-top: 2.5rem; margin-bottom: 0.8rem;
+    color: var(--text);
+  }
+  #editor p { margin-bottom: 1.35rem; }
+  #editor strong { font-weight: 600; }
+  #editor em { font-style: italic; }
+  #editor u { text-decoration: underline; text-underline-offset: 3px; }
+  #editor s { text-decoration: line-through; opacity: 0.5; }
+  #editor a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+
+  #editor blockquote {
+    position: relative;
+    margin: 2.5rem 0; padding: 0 2.5rem;
+    font-style: italic; font-size: 1.32rem;
+    line-height: 1.72; font-weight: 300;
+    color: var(--sub);
+  }
+  #editor blockquote::before {
+    content: '"';
+    position: absolute; left: -0.2rem; top: -1.4rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 6.5rem; line-height: 1;
+    color: var(--accent); opacity: 0.2;
+  }
+
+  #editor ul { list-style: none; padding: 0; margin-bottom: 1.4rem; }
+  #editor ul li { position: relative; padding-left: 1.7rem; margin-bottom: 0.5rem; }
+  #editor ul li::before { content: '—'; position: absolute; left: 0; color: var(--sub); }
+
+  #editor ol { padding-left: 1.9rem; margin-bottom: 1.4rem; }
+  #editor ol li { margin-bottom: 0.5rem; }
+
+  #editor img {
+    max-width: 100%; height: auto; display: block;
+    margin: 3rem auto; border-radius: 6px;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  /* Bottom decoration */
+  .bottom-rule {
+    height: 1px; margin-top: 4rem;
+    background: linear-gradient(to right, transparent, var(--border), transparent);
+    transition: background 0.4s;
+  }
+  .typer-sig {
+    margin-top: 1.5rem; text-align: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.8rem; letter-spacing: 0.15em;
+    text-transform: uppercase; color: var(--muted);
+    opacity: 0.4;
+  }
+
+  /* ─── Selection Toolbar ─── */
+  #sel-toolbar {
+    position: fixed; z-index: 100;
+    transform: translateX(-50%);
+    display: none;
+    animation: slideUp 0.2s var(--ease-silk) forwards;
+  }
+  #sel-toolbar.visible { display: block; }
+
+  .sel-inner {
+    display: flex; align-items: center; gap: 2px;
+    padding: 5px 8px; border-radius: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
+    transition: background 0.4s, border-color 0.4s;
+  }
+  body.light .sel-inner { box-shadow: 0 12px 40px rgba(0,0,0,0.1), 0 2px 8px rgba(0,0,0,0.06); }
+
+  .sel-arrow {
+    position: absolute; bottom: -5px; left: 50%;
+    transform: translateX(-50%);
+    width: 10px; height: 5px; overflow: hidden;
+  }
+  .sel-arrow::after {
+    content: '';
+    position: absolute; top: -5px; left: 0;
+    width: 10px; height: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    transform: rotate(45deg);
+    transition: background 0.4s, border-color 0.4s;
+  }
+
+  .s-btn {
+    width: 28px; height: 28px; border-radius: 6px;
+    border: none; background: transparent;
+    color: var(--sub); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.12s, color 0.12s;
+    flex-shrink: 0;
+  }
+  .s-btn:hover { background: var(--btn-hover); color: var(--text); }
+  .s-btn svg { width: 14px; height: 14px; stroke-width: 2; }
+
+  /* ─── Main Toolbar ─── */
+  #toolbar-wrap {
+    position: fixed; bottom: 2.2rem; left: 50%;
+    transform: translateX(-50%); z-index: 50;
+    transition: opacity 0.4s ease;
+  }
+
+  #toolbar {
+    display: flex; align-items: center; gap: 2px;
+    padding: 7px 12px; border-radius: 16px;
+    background: rgba(20,20,20,0.9);
+    border: 1px solid var(--border);
+    backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.7), 0 4px 16px rgba(0,0,0,0.4),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+    transition: background 0.4s, border-color 0.4s, box-shadow 0.4s;
+  }
+  body.light #toolbar {
+    background: rgba(255,253,249,0.92);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1), 0 4px 16px rgba(0,0,0,0.06),
+                inset 0 1px 0 rgba(255,255,255,0.8);
+  }
+
+  .t-btn {
+    width: 34px; height: 34px; border-radius: 8px;
+    border: none; background: transparent;
+    color: var(--sub); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s, transform 0.12s;
+    flex-shrink: 0; position: relative;
+  }
+  .t-btn:hover { background: var(--btn-hover); color: var(--text); transform: translateY(-1px); }
+  .t-btn:active { transform: scale(0.88); }
+  .t-btn svg { width: 16px; height: 16px; stroke-width: 2; }
+
+  .t-btn::after {
+    content: attr(data-tip);
+    position: absolute; bottom: calc(100% + 9px); left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0,0,0,0.88); color: #fff;
+    font-family: 'Crimson Pro', serif; font-size: 0.73rem;
+    letter-spacing: 0.04em; padding: 3px 8px; border-radius: 4px;
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; transition: opacity 0.15s;
+  }
+  .t-btn:hover::after { opacity: 1; }
+
+  .toolbar-glow {
+    position: absolute; bottom: -8px; left: 50%;
+    transform: translateX(-50%);
+    width: 60%; height: 1px;
+    background: radial-gradient(ellipse, rgba(201,169,110,0.4), transparent 70%);
+    filter: blur(4px); pointer-events: none;
+  }
+
+  /* Focus mode exit */
+  #focus-exit {
+    position: fixed; top: 1.5rem; right: 1.5rem;
+    z-index: 20; cursor: pointer;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.78rem; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--muted);
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.3s ease;
+    display: flex; align-items: center; gap: 6px;
+    border: none; background: transparent;
+  }
+  #focus-exit svg { width: 14px; height: 14px; }
+  #focus-exit:hover { opacity: 1 !important; }
+  body.focus-active #focus-exit { opacity: 0.45; pointer-events: auto; }
+
+  /* ─── Animations ─── */
+  @keyframes fadeIn {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.96); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  }
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 0.8; }
+    50%       { transform: scale(1.5); opacity: 1; }
+  }
+
+  /* ─── Scrollbar ─── */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="noise"></div>
+  <div id="orb"></div>
+
+  <!-- HEADER -->
+  <header id="header">
+    <div class="logo-wrap">
+      <div>
+        <div class="logo-name">Typer</div>
+        <div class="logo-sub">The Writer's Canvas</div>
+      </div>
+      <div class="stats-wrap">
+        <svg class="ring-svg" width="26" height="26" viewBox="0 0 26 26">
+          <circle class="ring-bg" cx="13" cy="13" r="10"/>
+          <circle class="ring-fg" id="ring" cx="13" cy="13" r="10"
+            stroke-dasharray="62.83" stroke-dashoffset="62.83"/>
+        </svg>
+        <div class="stats-text">
+          <div class="stat-main">
+            <span id="word-count">0</span>
+            <span id="goal-label"> / 500</span>
+          </div>
+          <div class="stat-sub">
+            <span id="read-time">1</span> min read &nbsp;·&nbsp;
+            <span id="char-count">0</span> chars
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="save-pill" id="save-pill">
+        <div class="save-dot"></div>
+        <span id="save-label">All good</span>
+      </div>
+      <button class="icon-btn" id="focus-btn" title="Focus Mode">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="17" height="17" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 8V6a2 2 0 012-2h2M4 16v2a2 2 0 002 2h2M16 4h2a2 2 0 012 2v2M16 20h2a2 2 0 002-2v-2"/></svg>
+      </button>
+      <button class="icon-btn" id="theme-btn" title="Toggle Theme">
+        <svg id="theme-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="17" height="17" stroke-width="2">
+          <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+        </svg>
+      </button>
+      <div class="sep"></div>
+      <button class="icon-btn" id="export-btn" title="Export as HTML">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" width="17" height="17" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN -->
+  <main id="main">
+    <div class="rule"></div>
+    <div
+      id="editor"
+      contenteditable="true"
+      spellcheck="false"
+    ><h1>The Art of Focus.</h1>
+<p>Welcome to <em>Typer</em> — your canvas for thought. No menus to memorize, no sidebars to manage. Just words, beautifully rendered, exactly as you intend them.</p>
+<blockquote>Simplicity is not the absence of clutter, but the presence of intention.</blockquote>
+<p>Select any text to reveal the <strong>contextual toolbar</strong>. Or use the persistent one below. Paste images directly from your clipboard — they flow naturally with your prose.</p>
+<p>When you're ready to export, your document preserves every detail of this layout.</p></div>
+    <div class="bottom-rule"></div>
+    <div class="typer-sig">✦ Typer</div>
+  </main>
+
+  <!-- FOCUS EXIT -->
+  <button id="focus-exit">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25"/></svg>
+    Exit Focus
+  </button>
+
+  <!-- SELECTION TOOLBAR -->
+  <div id="sel-toolbar">
+    <div class="sel-inner">
+      <button class="s-btn" data-cmd="bold" title="Bold">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg>
+      </button>
+      <button class="s-btn" data-cmd="italic" title="Italic">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+      </button>
+      <button class="s-btn" data-cmd="underline" title="Underline">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+      </button>
+      <button class="s-btn" data-cmd="strikeThrough" title="Strike">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 7h6m-6 0a3 3 0 000 6h6a3 3 0 010 6H9m12-9H3"/></svg>
+      </button>
+      <div class="sep" style="height:16px;margin:0 3px;"></div>
+      <button class="s-btn" data-block="h1" title="Title">H1</button>
+      <button class="s-btn" data-block="h2" title="Heading">H2</button>
+      <button class="s-btn" data-block="blockquote" title="Quote">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8h13M3 12h13M3 16h13"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 4h1a2 2 0 012 2v12a2 2 0 01-2 2H3"/></svg>
+      </button>
+    </div>
+    <div class="sel-arrow"></div>
+  </div>
+
+  <!-- MAIN TOOLBAR -->
+  <div id="toolbar-wrap">
+    <div id="toolbar">
+      <!-- Block format -->
+      <button class="t-btn" data-block="h1" data-tip="Title (H1)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h7"/></svg>
+      </button>
+      <button class="t-btn" data-block="h2" data-tip="Heading (H2)">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h10M4 18h7"/></svg>
+      </button>
+      <button class="t-btn" data-block="p" data-tip="Paragraph">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M13 4v16M9 4h8a4 4 0 010 8H9V4z"/></svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <!-- Inline format -->
+      <button class="t-btn" data-cmd="bold" data-tip="Bold ⌘B">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 4h8a4 4 0 014 4 4 4 0 01-4 4H6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M6 12h9a4 4 0 014 4 4 4 0 01-4 4H6z"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="italic" data-tip="Italic ⌘I">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="19" y1="4" x2="10" y2="4"/><line x1="14" y1="20" x2="5" y2="20"/><line x1="15" y1="4" x2="9" y2="20"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="underline" data-tip="Underline ⌘U">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M6 3v7a6 6 0 006 6 6 6 0 006-6V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="strikeThrough" data-tip="Strikethrough">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="5" y1="12" x2="19" y2="12"/><path d="M16 6a4 4 0 00-8 0c0 1.5.8 2.6 2 3.3M8 18a4 4 0 008 0"/></svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <!-- Structure -->
+      <button class="t-btn" data-block="blockquote" data-tip="Blockquote">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8 9h4m-4 6h8M5 5h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2z"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="insertUnorderedList" data-tip="Bullet List">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="9" y1="6" x2="20" y2="6"/><line x1="9" y1="12" x2="20" y2="12"/><line x1="9" y1="18" x2="20" y2="18"/><circle cx="4" cy="6" r="1" fill="currentColor"/><circle cx="4" cy="12" r="1" fill="currentColor"/><circle cx="4" cy="18" r="1" fill="currentColor"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="insertOrderedList" data-tip="Numbered List">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4M4 10h2M3 18h1.5a1.5 1.5 0 100-3H3v3h2a.5.5 0 010 1H3"/></svg>
+      </button>
+
+      <div class="sep"></div>
+
+      <!-- Align -->
+      <button class="t-btn" data-cmd="justifyLeft" data-tip="Align Left">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="15" y2="12"/><line x1="3" y1="18" x2="18" y2="18"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="justifyCenter" data-tip="Center">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </button>
+      <button class="t-btn" data-cmd="justifyRight" data-tip="Align Right">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="3" y1="6" x2="21" y2="6"/><line x1="9" y1="12" x2="21" y2="12"/><line x1="6" y1="18" x2="21" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="toolbar-glow"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const editor      = document.getElementById('editor');
+  const header      = document.getElementById('header');
+  const mainEl      = document.getElementById('main');
+  const savePill    = document.getElementById('save-pill');
+  const saveLabel   = document.getElementById('save-label');
+  const wordEl      = document.getElementById('word-count');
+  const charEl      = document.getElementById('char-count');
+  const readEl      = document.getElementById('read-time');
+  const ring        = document.getElementById('ring');
+  const themeBtn    = document.getElementById('theme-btn');
+  const focusBtn    = document.getElementById('focus-btn');
+  const focusExit   = document.getElementById('focus-exit');
+  const exportBtn   = document.getElementById('export-btn');
+  const selToolbar  = document.getElementById('sel-toolbar');
+  const toolbarWrap = document.getElementById('toolbar-wrap');
+
+  const GOAL = 500;
+  const CIRC = 2 * Math.PI * 10;
+  let saveTimer = null;
+  let isDark = true;
+  let isFocus = false;
+
+  /* ── Stats ── */
+  function updateStats() {
+    const text = editor.innerText || '';
+    const words = text.trim() === '' ? 0 : text.trim().split(/\s+/).filter(w => w).length;
+    const chars = text.replace(/\s/g, '').length;
+    const rt    = Math.max(1, Math.round(words / 238));
+    wordEl.textContent = words.toLocaleString();
+    charEl.textContent = chars.toLocaleString();
+    readEl.textContent = rt;
+    // Ring
+    const prog = Math.min(1, words / GOAL);
+    ring.style.strokeDashoffset = CIRC * (1 - prog);
+    // Save
+    setSaving();
+  }
+
+  function setSaving() {
+    clearTimeout(saveTimer);
+    savePill.classList.add('active');
+    saveLabel.textContent = 'Saving…';
+    saveTimer = setTimeout(() => {
+      savePill.classList.remove('active');
+      saveLabel.textContent = 'All good';
+    }, 1600);
+  }
+
+  /* ── Theme ── */
+  function setTheme(dark) {
+    isDark = dark;
+    if (dark) {
+      document.body.classList.remove('light');
+    } else {
+      document.body.classList.add('light');
+    }
+    // Update icon
+    const iconSvg = document.getElementById('theme-icon');
+    if (dark) {
+      iconSvg.innerHTML = '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+    } else {
+      iconSvg.innerHTML = '<path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>';
+    }
+  }
+
+  themeBtn.addEventListener('click', () => setTheme(!isDark));
+
+  /* ── Focus Mode ── */
+  function setFocus(on) {
+    isFocus = on;
+    if (on) {
+      header.classList.add('hidden');
+      mainEl.classList.add('focus-mode');
+      document.body.classList.add('focus-active');
+    } else {
+      header.classList.remove('hidden');
+      mainEl.classList.remove('focus-mode');
+      document.body.classList.remove('focus-active');
+    }
+  }
+
+  focusBtn.addEventListener('click', () => setFocus(!isFocus));
+  focusExit.addEventListener('click', () => setFocus(false));
+
+  /* ── Exec commands ── */
+  function exec(cmd, val) {
+    document.execCommand(cmd, false, val || null);
+    editor.focus();
+    updateStats();
+  }
+
+  function formatBlock(tag) {
+    exec('formatBlock', tag);
+  }
+
+  /* ── Toolbar clicks (main + selection) ── */
+  document.querySelectorAll('[data-cmd]').forEach(btn => {
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      exec(btn.dataset.cmd);
+      hideSelToolbar();
+    });
+  });
+
+  document.querySelectorAll('[data-block]').forEach(btn => {
+    btn.addEventListener('mousedown', e => {
+      e.preventDefault();
+      formatBlock(btn.dataset.block);
+      hideSelToolbar();
+    });
+  });
+
+  /* ── Selection toolbar ── */
+  function hideSelToolbar() {
+    selToolbar.classList.remove('visible');
+  }
+
+  document.addEventListener('selectionchange', () => {
+    const sel = window.getSelection();
+    if (!sel || sel.isCollapsed || !sel.rangeCount || !sel.toString().trim()) {
+      hideSelToolbar();
+      return;
+    }
+    // Only show if inside editor
+    const node = sel.anchorNode;
+    if (!editor.contains(node)) { hideSelToolbar(); return; }
+
+    const range = sel.getRangeAt(0);
+    const rect  = range.getBoundingClientRect();
+    if (!rect.width) { hideSelToolbar(); return; }
+
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + window.scrollY - 12;
+
+    selToolbar.style.left = x + 'px';
+    selToolbar.style.top  = (y - 50) + 'px';
+    selToolbar.classList.add('visible');
+  });
+
+  document.addEventListener('mousedown', e => {
+    if (!selToolbar.contains(e.target)) hideSelToolbar();
+  });
+
+  /* ── Paste images ── */
+  editor.addEventListener('paste', e => {
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        const reader = new FileReader();
+        reader.onload = ev => {
+          exec('insertImage', ev.target.result);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  });
+
+  /* ── Input ── */
+  editor.addEventListener('input', updateStats);
+  editor.addEventListener('keyup', updateStats);
+
+  /* ── Export ── */
+  exportBtn.addEventListener('click', () => {
+    const html    = editor.innerHTML;
+    const accent  = isDark ? '#c9a96e' : '#9b6e30';
+    const bgColor = isDark ? '#0d0d0d' : '#f7f4ef';
+    const txColor = isDark ? '#e8e4dc' : '#1a1814';
+    const subColor = isDark ? '#666'   : '#9a9488';
+
+    const out = `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Typer Export</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Crimson+Pro:ital,wght@0,300;0,400;1,300;1,400&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Crimson Pro',Georgia,serif;background:${bgColor};color:${txColor};max-width:680px;margin:80px auto;padding:0 32px 120px;font-size:1.22rem;line-height:1.9;font-weight:300;-webkit-font-smoothing:antialiased}
+h1{font-family:'Cormorant Garamond',serif;font-size:3.5rem;font-weight:600;letter-spacing:-0.025em;line-height:1.07;margin-bottom:1.8rem;margin-top:0.5rem}
+h2{font-family:'Cormorant Garamond',serif;font-size:2.1rem;font-weight:500;margin-top:3.2rem;margin-bottom:1rem;letter-spacing:-0.01em}
+h3{font-family:'Cormorant Garamond',serif;font-size:1.5rem;font-weight:500;font-style:italic;margin-top:2.5rem;margin-bottom:.8rem}
+p{margin-bottom:1.35rem}
+blockquote{position:relative;margin:2.5rem 0;padding:0 2.5rem;font-style:italic;font-size:1.3rem;line-height:1.72;color:${subColor}}
+blockquote::before{content:'"';position:absolute;left:-.2rem;top:-1.4rem;font-family:'Cormorant Garamond',serif;font-size:6.5rem;line-height:1;color:${accent};opacity:.2}
+ul{list-style:none;padding:0;margin-bottom:1.4rem}ul li{position:relative;padding-left:1.7rem;margin-bottom:.5rem}ul li::before{content:'—';position:absolute;left:0;color:${subColor}}
+ol{padding-left:1.9rem;margin-bottom:1.4rem}ol li{margin-bottom:.5rem}
+img{max-width:100%;height:auto;display:block;margin:3rem auto;border-radius:6px}
+a{color:${accent};text-decoration:underline;text-underline-offset:3px}
+strong{font-weight:600}em{font-style:italic}
+</style>
+</head>
+<body>${html}</body>
+</html>`;
+
+    const blob = new Blob([out], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'typer-document.html';
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  /* ── Init ── */
+  editor.focus();
+  updateStats();
+
+})();
+</script>
+</body>
+</html>
